@@ -1,9 +1,12 @@
 import SwiftUI
+import Combine
 import AppKit
 
 struct BitcoinMenuView: View {
     @ObservedObject var store: BlockStore
     @ObservedObject var settings: SettingsStore
+    @State private var now = Date()
+    private let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private let crtBlue = Color(red: 0.278, green: 0.439, blue: 0.647)
     private let crtBrightText = Color(red: 0.9, green: 0.95, blue: 1.0)
@@ -24,7 +27,7 @@ struct BitcoinMenuView: View {
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(crtBrightText)
 
-                        Text("Time ago: \(timeAgoSimple(from: date))")
+                        Text("Time ago: \(timeAgoSimple(from: date, now: now))")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(crtBrightText)
 
@@ -46,7 +49,7 @@ struct BitcoinMenuView: View {
                     }
 
                     if let fees = snapshot.fees {
-                        Text("Fees (sat/vB): \(fees.fastestFee) / \(fees.halfHourFee) / \(fees.hourFee)")
+                        Text("Fees (low/med/high sat/vB): \(formatFee(fees.hourFee)) / \(formatFee(fees.halfHourFee)) / \(formatFee(fees.fastestFee))")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(crtBrightText)
                     }
@@ -204,6 +207,7 @@ struct BitcoinMenuView: View {
             .padding(.bottom, 6)
         }
         .frame(width: 280)
+        .onReceive(timer) { now = $0 }
     }
 
     private func formatNumber(_ number: Int) -> String {
@@ -220,8 +224,19 @@ struct BitcoinMenuView: View {
         return formatter.string(from: NSNumber(value: price)) ?? String(format: "%.2f", price)
     }
 
-    private func timeAgoSimple(from date: Date) -> String {
-        let seconds = Int(Date().timeIntervalSince(date))
+    private func formatFee(_ fee: Double) -> String {
+        let isWhole = abs(fee.rounded() - fee) < 0.0001
+        if fee >= 10 {
+            return String(format: isWhole ? "%.0f" : "%.1f", fee)
+        } else if fee >= 1 {
+            return String(format: isWhole ? "%.0f" : "%.1f", fee)
+        } else {
+            return String(format: "%.1f", fee)
+        }
+    }
+
+    private func timeAgoSimple(from date: Date, now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(date))
         if seconds < 60 {
             return "\(seconds) seconds"
         } else if seconds < 3600 {

@@ -75,9 +75,13 @@ struct PriceResponse: Decodable {
 }
 
 struct FeesResponse: Decodable {
-    let fastestFee: Int
-    let halfHourFee: Int
-    let hourFee: Int
+    let fastestFee: Double
+    let halfHourFee: Double
+    let hourFee: Double
+}
+
+struct MempoolBlockFee: Decodable {
+    let medianFee: Double
 }
 
 struct DifficultyAdjustment: Decodable {

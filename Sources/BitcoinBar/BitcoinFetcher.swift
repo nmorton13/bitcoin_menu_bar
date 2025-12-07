@@ -53,13 +53,37 @@ struct BitcoinFetcher {
     }
 
     private func fetchFees() async -> FeesResponse? {
-        let url = v1URL.appendingPathComponent("fees/recommended")
-        return await fetch(url: url, as: FeesResponse.self)
+        if let recommended = await fetchFeesRecommended() {
+            return recommended
+        }
+        return await fetchFeesFromMempoolBlocks()
     }
 
     private func fetchDifficulty() async -> DifficultyAdjustment? {
         let url = v1URL.appendingPathComponent("difficulty-adjustment")
         return await fetch(url: url, as: DifficultyAdjustment.self)
+    }
+
+    private func fetchFeesRecommended() async -> FeesResponse? {
+        let url = v1URL.appendingPathComponent("fees/recommended")
+        return await fetch(url: url, as: FeesResponse.self)
+    }
+
+    private func fetchFeesFromMempoolBlocks() async -> FeesResponse? {
+        let url = v1URL.appendingPathComponent("fees/mempool-blocks")
+        guard let blocks: [MempoolBlockFee] = await fetchArray(MempoolBlockFee.self, url: url),
+              !blocks.isEmpty else {
+            return nil
+        }
+
+        let fastest = blocks[0].medianFee
+        let halfHour = blocks[min(2, blocks.count - 1)].medianFee
+        let hour = blocks[min(5, blocks.count - 1)].medianFee
+        return FeesResponse(
+            fastestFee: roundedFee(fastest),
+            halfHourFee: roundedFee(halfHour),
+            hourFee: roundedFee(hour)
+        )
     }
 
     private func fetchArray<T: Decodable>(_ type: T.Type, url: URL) async -> [T]? {
@@ -84,6 +108,10 @@ struct BitcoinFetcher {
         } catch {
             return nil
         }
+    }
+
+    private func roundedFee(_ fee: Double) -> Double {
+        (fee * 10).rounded(.toNearestOrAwayFromZero) / 10
     }
 }
 
