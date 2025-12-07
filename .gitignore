@@ -1,0 +1,36 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+
+# Build artifacts
+BitcoinBar.app
+*.zip
+*.dmg
+RELEASE.md
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# App-specific
+Resources/.DS_Store
+app_i_have_built/
+.claude/
+idea.txt
+
+# Temporary files
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+
+RELEASE.md 
