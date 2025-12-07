@@ -23,8 +23,8 @@ A minimal macOS menu bar app that displays real-time Bitcoin network information
 ## Installation
 
 1. Download `BitcoinBar-1.0.0.zip` from the [Releases](https://github.com/nmorton13/bitcoin_menu_bar/releases) page
-2. Unzip and drag `BitcoinBar.app` to your Applications folder
-3. Right-click the app and select "Open" (first time only)
+2. Unzip and drag `BitcoinBar.app` to Applications (recommended) or run it from a folder of your choice
+3. Double-click to launch (notarized build)
 4. The Bitcoin symbol (₿) will appear in your menu bar
 
 ## Building from Source
