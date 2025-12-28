@@ -41,6 +41,20 @@ enum RefreshInterval: String, CaseIterable, Identifiable {
     }
 }
 
+enum PriceSource: String {
+    case coinGecko
+    case mempool
+
+    var label: String {
+        switch self {
+        case .coinGecko:
+            return "CoinGecko"
+        case .mempool:
+            return "mempool.space"
+        }
+    }
+}
+
 struct BlockInfo: Decodable {
     let id: String
     let height: Int
@@ -104,6 +118,8 @@ struct BitcoinSnapshot {
     var block: BlockInfo?
     var mempool: MempoolStats?
     var priceUSD: Double?
+    var priceChange24h: Double?
+    var priceSource: PriceSource?
     var fees: FeesResponse?
     var difficulty: DifficultyAdjustment?
     var fetchedAt: Date
@@ -117,4 +133,18 @@ struct BitcoinSnapshot {
         let sats = 100_000_000 / priceUSD
         return Int(sats.rounded())
     }
+}
+
+struct CoinGeckoPrice: Decodable {
+    let usd: Double?
+    let usd24hChange: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case usd
+        case usd24hChange = "usd_24h_change"
+    }
+}
+
+struct CoinGeckoResponse: Decodable {
+    let bitcoin: CoinGeckoPrice?
 }

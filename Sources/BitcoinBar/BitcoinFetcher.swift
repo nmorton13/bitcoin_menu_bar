@@ -3,6 +3,7 @@ import Foundation
 struct BitcoinFetcher {
     private let baseURL = URL(string: "https://mempool.space/api")!
     private let v1URL = URL(string: "https://mempool.space/api/v1")!
+    private let coinGeckoURL = URL(string: "https://api.coingecko.com/api/v3")!
     private let session: URLSession
 
     init(session: URLSession? = nil) {
@@ -19,14 +20,17 @@ struct BitcoinFetcher {
     func fetchSnapshot() async -> BitcoinSnapshot {
         async let block: BlockInfo? = fetchLatestBlock()
         async let mempool: MempoolStats? = fetchMempoolStats()
-        async let price: Double? = fetchPrice()
+        async let priceData: (price: Double?, change: Double?, source: PriceSource?) = fetchPriceWithChange()
         async let fees: FeesResponse? = fetchFees()
         async let difficulty: DifficultyAdjustment? = fetchDifficulty()
 
+        let price = await priceData
         let snapshot = BitcoinSnapshot(
             block: await block,
             mempool: await mempool,
-            priceUSD: await price,
+            priceUSD: price.price,
+            priceChange24h: price.change,
+            priceSource: price.source,
             fees: await fees,
             difficulty: await difficulty,
             fetchedAt: Date()
@@ -46,10 +50,25 @@ struct BitcoinFetcher {
         return await fetch(url: url, as: MempoolStats.self)
     }
 
-    private func fetchPrice() async -> Double? {
-        let url = v1URL.appendingPathComponent("prices")
-        let response: PriceResponse? = await fetch(url: url, as: PriceResponse.self)
-        return response?.usd
+    private func fetchPriceWithChange() async -> (price: Double?, change: Double?, source: PriceSource?) {
+        // Try CoinGecko first for 24h change
+        let url = coinGeckoURL.appendingPathComponent("simple/price")
+            .appending(queryItems: [
+                URLQueryItem(name: "ids", value: "bitcoin"),
+                URLQueryItem(name: "vs_currencies", value: "usd"),
+                URLQueryItem(name: "include_24hr_change", value: "true")
+            ])
+
+        if let response: CoinGeckoResponse = await fetch(url: url, as: CoinGeckoResponse.self),
+           let bitcoin = response.bitcoin {
+            return (bitcoin.usd, bitcoin.usd24hChange, .coinGecko)
+        }
+
+        // Fallback to mempool.space (no 24h change)
+        let mempoolURL = v1URL.appendingPathComponent("prices")
+        let mempoolResponse: PriceResponse? = await fetch(url: mempoolURL, as: PriceResponse.self)
+        let source: PriceSource? = mempoolResponse?.usd == nil ? nil : .mempool
+        return (mempoolResponse?.usd, nil, source)
     }
 
     private func fetchFees() async -> FeesResponse? {

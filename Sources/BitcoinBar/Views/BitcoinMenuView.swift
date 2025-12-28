@@ -5,139 +5,262 @@ import AppKit
 struct BitcoinMenuView: View {
     @ObservedObject var store: BlockStore
     @ObservedObject var settings: SettingsStore
-    @State private var now = Date()
-    private let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+    private static let numberFormatter = makeNumberFormatter()
+    private static let priceFormatter = makePriceFormatter()
 
-    private let crtBlue = Color(red: 0.278, green: 0.439, blue: 0.647)
-    private let crtBrightText = Color(red: 0.9, green: 0.95, blue: 1.0)
-    private let crtBorder = Color(red: 0.5, green: 0.65, blue: 0.8)
+    // Bitcoin orange/amber theme
+    private let accentColor = Color.orange
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            content(now: context.date)
+        }
+    }
+
+    private func content(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             if let snapshot = store.snapshot {
-                VStack(alignment: .leading, spacing: 3) {
-                    if let block = snapshot.block {
-                        Text("Bitcoin Block #\(formatNumber(block.height))")
-                            .font(.system(size: 13, design: .monospaced))
-                            .fontWeight(.bold)
-                            .foregroundStyle(crtBrightText)
+                // Header Card - Block Info
+                if let block = snapshot.block {
+                    let date = Date(timeIntervalSince1970: block.timestamp)
+                    HStack(spacing: 10) {
+                        // Bitcoin icon box
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(accentColor.opacity(0.2))
+                                .frame(width: 36, height: 36)
+                            Text("₿")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(accentColor)
+                        }
 
-                        let date = Date(timeIntervalSince1970: block.timestamp)
-                        Text("Mined: \(date.formatted(date: .abbreviated, time: .standard))")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(crtBrightText)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Block #\(formatNumber(block.height))")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            Text("\(timeAgoSimple(from: date, now: now)) ago")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
 
-                        Text("Time ago: \(timeAgoSimple(from: date, now: now))")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(crtBrightText)
+                        Spacer()
 
-                        Text("Transactions: \(formatNumber(block.txCount))")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(crtBrightText)
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text("\(formatNumber(block.txCount))")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                            Text("txns")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .padding(10)
+                    .background(Color.primary.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
 
+                // Price & Sats Row
+                HStack(spacing: 6) {
                     if let price = snapshot.priceUSD {
-                        Text("Price: \(formatPrice(price))")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(crtBrightText)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text("Price")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                if let change = snapshot.priceChange24h {
+                                    HStack(spacing: 2) {
+                                        Image(systemName: change >= 0 ? "arrow.up" : "arrow.down")
+                                            .font(.system(size: 8, weight: .bold))
+                                        Text("\(String(format: "%.1f", abs(change)))%")
+                                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    }
+                                    .foregroundStyle(change >= 0 ? .green : .red)
+                                }
+                            }
+                            Text("$\(formatPrice(price))")
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.primary.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
 
                     if let sats = snapshot.satsPerDollar {
-                        Text("Sats per $: \(formatNumber(sats))")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(crtBrightText)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Sats/$")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                            Text(formatNumber(sats))
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.primary.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
+                }
+                .fixedSize(horizontal: false, vertical: true)
 
-                    if let fees = snapshot.fees {
-                        Text("Fees (low/med/high sat/vB): \(formatFee(fees.hourFee)) / \(formatFee(fees.halfHourFee)) / \(formatFee(fees.fastestFee))")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(crtBrightText)
+                // Fees Row
+                if let fees = snapshot.fees {
+                    VStack(spacing: 6) {
+                        HStack {
+                            Text("Fees")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("sat/vB")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
+                        }
+
+                        HStack(spacing: 6) {
+                            FeeBox(label: "Low", value: formatFee(fees.hourFee), color: .green)
+                            FeeBox(label: "Med", value: formatFee(fees.halfHourFee), color: .yellow)
+                            FeeBox(label: "High", value: formatFee(fees.fastestFee), color: .red)
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
                     }
+                    .padding(10)
+                    .background(Color.primary.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
 
-                    if let difficulty = snapshot.difficulty {
+                // Difficulty Row
+                if let difficulty = snapshot.difficulty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Difficulty")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            if let delta = difficulty.estimatedDifficultyDelta {
+                                let sign = delta >= 0 ? "+" : ""
+                                Text("\(sign)\(String(format: "%.1f", delta))%")
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(delta >= 0 ? .green : .red)
+                            }
+                        }
+
+                        // Progress bar
+                        if let progress = difficulty.progressPercent {
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.primary.opacity(0.1))
+                                    .frame(height: 6)
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(accentColor)
+                                    .frame(width: max(0, 240 * progress / 100), height: 6)
+                            }
+
+                            HStack {
+                                Text("\(String(format: "%.0f", progress))%")
+                                    .font(.system(size: 9, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                if let remaining = difficulty.remainingBlocks {
+                                    let days = Double(remaining) * 10.0 / 60.0 / 24.0
+                                    Text("~\(String(format: "%.1f", days)) days")
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
                         if let avg = difficulty.averageBlockTime {
-                            let avgSeconds = avg / 1000.0  // Convert milliseconds to seconds
+                            let avgSeconds = avg / 1000.0
                             let minutes = Int(avgSeconds) / 60
                             let seconds = Int(avgSeconds) % 60
-                            Text("Avg block time: \(minutes)m \(seconds)s")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(crtBrightText)
-                        }
-
-                        if let delta = difficulty.estimatedDifficultyDelta {
-                            let sign = delta >= 0 ? "+" : ""
-                            Text("Difficulty adj: \(sign)\(String(format: "%.2f", delta))%")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(crtBrightText)
-                        }
-
-                        if let remaining = difficulty.remainingBlocks {
-                            let days = Double(remaining) * 10.0 / 60.0 / 24.0
-                            Text("Next adj: \(String(format: "%.1f", days)) days")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(crtBrightText)
+                            HStack {
+                                Text("Avg block")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(minutes)m \(seconds)s")
+                                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                            }
                         }
                     }
-
-                    Spacer()
-                        .frame(height: 8)
-
-                    Button(action: {
-                        if let url = URL(string: "https://mempool.space") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }) {
-                        Text("Click to view on mempool.space")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(crtBrightText)
-                            .underline()
-                    }
-                    .buttonStyle(.plain)
+                    .padding(10)
+                    .background(Color.primary.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(crtBlue)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(crtBorder, lineWidth: 2)
-                )
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
+
+                // Link to mempool.space
+                Button(action: {
+                    if let url = URL(string: "https://mempool.space") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.system(size: 9))
+                        Text("mempool.space")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
 
             } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(store.errorMessage ?? "Loading block data...")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(crtBrightText)
+                HStack {
+                    if store.isFetching {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                    }
+                    Text(store.errorMessage ?? "Loading...")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(crtBlue)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(crtBorder, lineWidth: 2)
-                )
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
+                .frame(maxWidth: .infinity)
+                .padding(12)
+                .background(Color.primary.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
 
-            VStack(spacing: 0) {
-                Divider()
-                    .padding(.vertical, 6)
+            if let error = store.errorMessage {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.red)
+                    Text(error)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 4)
+            }
 
+            if let snapshot = store.snapshot {
+                HStack {
+                    Text("Updated \(timeAgoSimple(from: snapshot.fetchedAt, now: now)) ago")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if let source = snapshot.priceSource {
+                        Text("Price: \(source.label)")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+
+            Divider()
+
+            // Menu Actions
+            VStack(spacing: 0) {
                 MenuButton(
                     icon: "arrow.clockwise",
-                    title: store.isFetching ? "Refreshing…" : "Refresh Now",
+                    title: store.isFetching ? "Refreshing..." : "Refresh Now",
                     disabled: store.isFetching
                 ) {
                     Task { await store.refresh() }
                 }
 
-                Divider()
-                    .padding(.vertical, 4)
-
                 Menu {
-                    Menu("Refresh every: \(settings.refreshInterval.label)") {
+                    Menu("Refresh: \(settings.refreshInterval.label)") {
                         ForEach(RefreshInterval.allCases) { option in
                             Button {
                                 settings.setRefreshInterval(option)
@@ -150,7 +273,7 @@ struct BitcoinMenuView: View {
                             }
                         }
                     }
-                    Menu("Icon style: \(settings.iconStyle.label)") {
+                    Menu("Icon: \(settings.iconStyle.label)") {
                         ForEach(IconStyle.allCases) { option in
                             Button {
                                 settings.setIconStyle(option)
@@ -168,6 +291,12 @@ struct BitcoinMenuView: View {
                     }, set: { value in
                         settings.toggleLaunchAtLogin(value)
                     }))
+                    if let launchError = settings.launchError {
+                        Text("Launch failed: \(launchError)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.red)
+                            .lineLimit(2)
+                    }
                 } label: {
                     HStack {
                         Image(systemName: "gearshape")
@@ -204,24 +333,18 @@ struct BitcoinMenuView: View {
                     NSApplication.shared.terminate(nil)
                 }
             }
-            .padding(.bottom, 6)
         }
+        .padding(8)
         .frame(width: 280)
-        .onReceive(timer) { now = $0 }
+        .background(.ultraThinMaterial)
     }
 
     private func formatNumber(_ number: Int) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return formatter.string(from: NSNumber(value: number)) ?? "\(number)"
+        Self.numberFormatter.string(from: NSNumber(value: number)) ?? "\(number)"
     }
 
     private func formatPrice(_ price: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: price)) ?? String(format: "%.2f", price)
+        Self.priceFormatter.string(from: NSNumber(value: price)) ?? String(format: "%.2f", price)
     }
 
     private func formatFee(_ fee: Double) -> String {
@@ -236,7 +359,10 @@ struct BitcoinMenuView: View {
     }
 
     private func timeAgoSimple(from date: Date, now: Date) -> String {
-        let seconds = Int(now.timeIntervalSince(date))
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        if seconds < 5 {
+            return "just now"
+        }
         if seconds < 60 {
             return "\(seconds) seconds"
         } else if seconds < 3600 {
@@ -249,6 +375,20 @@ struct BitcoinMenuView: View {
             let days = seconds / 86400
             return "\(days) \(days == 1 ? "day" : "days")"
         }
+    }
+
+    private static func makeNumberFormatter() -> NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter
+    }
+
+    private static func makePriceFormatter() -> NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter
     }
 }
 
@@ -287,5 +427,30 @@ struct MenuButton: View {
         .onHover { hovering in
             isHovered = hovering
         }
+    }
+}
+
+struct FeeBox: View {
+    let label: String
+    let value: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 6, height: 6)
+                Text(label)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(Color.primary.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }

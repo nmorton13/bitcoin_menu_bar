@@ -11,8 +11,15 @@ final class BlockStore: ObservableObject {
 
     private let fetcher = BitcoinFetcher()
     private var refreshTask: Task<Void, Never>?
+    private var stalenessTask: Task<Void, Never>?
     private weak var settings: SettingsStore?
     private var cancellables = Set<AnyCancellable>()
+    private var lastPriceChange24h: Double?
+
+    deinit {
+        refreshTask?.cancel()
+        stalenessTask?.cancel()
+    }
 
     func attach(settings: SettingsStore) {
         self.settings = settings
@@ -23,6 +30,7 @@ final class BlockStore: ObservableObject {
             .store(in: &cancellables)
         Task { await refresh() }
         restartTimer()
+        startStalenessTimer()
     }
 
     func refresh() async {
@@ -32,12 +40,20 @@ final class BlockStore: ObservableObject {
         let result = await fetchWithRetry()
 
         if let result {
-            snapshot = result
+            if let change = result.priceChange24h {
+                lastPriceChange24h = change
+                snapshot = result
+            } else if let lastChange = lastPriceChange24h {
+                var updated = result
+                updated.priceChange24h = lastChange
+                snapshot = updated
+            } else {
+                snapshot = result
+            }
             lastSuccessfulFetch = Date()
             isFetching = false
             updateStaleness()
         } else {
-            snapshot = nil
             markError("Unable to load Bitcoin data.")
         }
     }
@@ -50,16 +66,30 @@ final class BlockStore: ObservableObject {
 
     private func restartTimer() {
         refreshTask?.cancel()
+        refreshTask = nil
+
         guard let settings else { return }
+        let intervalSeconds = settings.refreshInterval.minutes * 60
+        guard intervalSeconds > 0 else { return }
 
-        let intervalMinutes = settings.refreshInterval.minutes
-        guard intervalMinutes > 0 else { return }
-
-        refreshTask = Task { [weak self] in
-            while let self {
-                try? await Task.sleep(for: .seconds(intervalMinutes * 60))
-                if Task.isCancelled { break }
+        refreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(intervalSeconds))
+                guard !Task.isCancelled else { break }
                 await self.refresh()
+            }
+        }
+    }
+
+    private func startStalenessTimer() {
+        stalenessTask?.cancel()
+        stalenessTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { break }
+                await MainActor.run {
+                    self.updateStaleness()
+                }
             }
         }
     }
