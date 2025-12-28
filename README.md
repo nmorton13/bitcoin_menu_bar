@@ -5,11 +5,11 @@ A minimal macOS menu bar app that displays real-time Bitcoin network information
 ## Features
 
 - 📊 Live Bitcoin block height and stats
-- 💰 Current BTC price and sats per dollar
+- 💰 Current BTC price, sats per dollar, and 24h change
 - ⚡ Network fee recommendations
-- ⏱️ Average block time and difficulty adjustments
-- 🔄 Automatic refresh intervals (5, 10, or 15 minutes)
-- 🎨 Clean, retro CRT-inspired design
+- ⏱️ Average block time, difficulty progress, and retarget estimate
+- 🔄 Manual or automatic refresh intervals (5, 10, or 15 minutes)
+- 🎨 Compact card-based menu layout with menu bar icon options
 
 ## Download
 
@@ -22,7 +22,7 @@ A minimal macOS menu bar app that displays real-time Bitcoin network information
 
 ## Installation
 
-1. Download `BitcoinBar-1.0.0.zip` from the [Releases](https://github.com/nmorton13/bitcoin_menu_bar/releases) page
+1. Download from the [Releases](https://github.com/nmorton13/bitcoin_menu_bar/releases) page
 2. Unzip and drag `BitcoinBar.app` to Applications (recommended) or run it from a folder of your choice
 3. Double-click to launch (notarized build)
 4. The Bitcoin symbol (₿) will appear in your menu bar
@@ -51,7 +51,9 @@ open BitcoinBar.app
 
 ## Data Source
 
-- All Bitcoin data is fetched from the public [mempool.space API](https://mempool.space/docs/api) over HTTPS. No API keys or personal data are used—just anonymous requests for the latest blocks, mempool stats, price, fees, and difficulty info.
+- Most Bitcoin data is fetched from the public [mempool.space API](https://mempool.space/docs/api) over HTTPS.
+- BTC price and 24h change are fetched from [CoinGecko](https://www.coingecko.com/en/api).
+- No API keys or personal data are used—just anonymous requests for the latest blocks, mempool stats, price, fees, and difficulty info.
 
 ## Privacy
 
