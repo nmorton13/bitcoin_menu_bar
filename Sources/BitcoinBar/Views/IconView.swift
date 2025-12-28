@@ -5,6 +5,7 @@ struct IconView: View {
     let snapshot: BitcoinSnapshot?
     let isStale: Bool
     @ObservedObject var settings: SettingsStore
+    private static let numberFormatter = makeNumberFormatter()
 
     var body: some View {
         Image(nsImage: makeIcon())
@@ -56,10 +57,7 @@ struct IconView: View {
     private func makeBlockHeightIcon() -> NSImage {
         let formattedNumber: String
         if let height = snapshot?.block?.height {
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .decimal
-            formatter.groupingSeparator = ","
-            formattedNumber = formatter.string(from: NSNumber(value: height)) ?? String(height)
+            formattedNumber = Self.numberFormatter.string(from: NSNumber(value: height)) ?? String(height)
         } else {
             formattedNumber = "---"
         }
@@ -89,5 +87,12 @@ struct IconView: View {
         image.unlockFocus()
         image.isTemplate = true
         return image
+    }
+
+    private static func makeNumberFormatter() -> NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        return formatter
     }
 }

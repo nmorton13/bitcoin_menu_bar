@@ -24,6 +24,7 @@ struct BitcoinBarApp: App {
                 settings: settings
             )
         }
+        .menuBarExtraStyle(.window)
         Settings {
             EmptyView()
         }
