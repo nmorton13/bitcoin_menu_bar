@@ -4,7 +4,7 @@ set -euo pipefail
 APP_NAME="BitcoinBar"
 APP_IDENTITY="${APP_IDENTITY:-Developer ID Application}"
 APP_BUNDLE="BitcoinBar.app"
-VERSION="1.0.0"
+VERSION="1.0.2"
 ZIP_NAME="BitcoinBar-${VERSION}.zip"
 
 # Look for API key file

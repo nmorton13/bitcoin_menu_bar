@@ -63,6 +63,7 @@ struct BlockInfo: Decodable {
     let size: Int
     let weight: Int
     let difficulty: Double?
+    let extras: BlockExtras?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -72,12 +73,87 @@ struct BlockInfo: Decodable {
         case size
         case weight
         case difficulty
+        case extras
+    }
+}
+
+struct BlockExtras: Decodable {
+    let feeRange: [Double]?
+    let medianFee: Double?
+    let totalFees: Double?
+    let reward: Double?
+    let pool: BlockPool?
+
+    var totalFeesBTC: Double? {
+        guard let totalFees else { return nil }
+        return totalFees / 100_000_000
+    }
+
+    var rewardBTC: Double? {
+        guard let reward else { return nil }
+        return reward / 100_000_000
+    }
+
+    var poolName: String? {
+        pool?.name ?? pool?.slug
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicCodingKey.self)
+        feeRange = container.decodeIfPresent([Double].self, forKeys: ["feeRange", "fee_range"])
+        medianFee = container.decodeIfPresent(Double.self, forKeys: ["medianFee", "median_fee"])
+        totalFees = container.decodeIfPresent(Double.self, forKeys: ["totalFees", "total_fees"])
+        reward = container.decodeIfPresent(Double.self, forKeys: ["reward", "subsidy", "subsidy_fee", "total_reward", "totalReward"])
+        pool = container.decodeIfPresent(BlockPool.self, forKeys: ["pool", "miner", "miningPool"])
+    }
+}
+
+struct BlockPool: Decodable {
+    let name: String?
+    let slug: String?
+
+    init(from decoder: Decoder) throws {
+        if let single = try? decoder.singleValueContainer(),
+           let value = try? single.decode(String.self) {
+            name = value
+            slug = nil
+            return
+        }
+
+        let container = try decoder.container(keyedBy: DynamicCodingKey.self)
+        name = container.decodeIfPresent(String.self, forKeys: ["name", "poolName"])
+        slug = container.decodeIfPresent(String.self, forKeys: ["slug"])
     }
 }
 
 struct MempoolStats: Decodable {
     let count: Int
     let vsize: Int
+}
+
+private struct DynamicCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int? { nil }
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue: Int) {
+        return nil
+    }
+}
+
+private extension KeyedDecodingContainer where K == DynamicCodingKey {
+    func decodeIfPresent<T: Decodable>(_ type: T.Type, forKeys keys: [String]) -> T? {
+        for key in keys {
+            guard let codingKey = DynamicCodingKey(stringValue: key) else { continue }
+            if let value = try? decodeIfPresent(type, forKey: codingKey) {
+                return value
+            }
+        }
+        return nil
+    }
 }
 
 struct PriceResponse: Decodable {

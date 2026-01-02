@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 CONF=${1:-release}
-VERSION=${VERSION:-1.0.1}
-BUILD=${BUILD:-2}
+VERSION=${VERSION:-1.0.2}
+BUILD=${BUILD:-3}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
