@@ -9,11 +9,13 @@ struct BitcoinMenuView: View {
     private static let priceFormatter = makePriceFormatter()
     private static let dateFormatter = makeDateFormatter()
     private static let btcFormatter = makeBTCFormatter()
+    private static let shortDateFormatter = makeShortDateFormatter()
 
     // Bitcoin orange/amber theme
     private let accentColor = Color.orange
     @State private var showBlockDetails = false
     @State private var isBlockHovered = false
+    @State private var showPriceDetails = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -107,6 +109,24 @@ struct BitcoinMenuView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.primary.opacity(0.06))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
+                        .onTapGesture {
+                            showPriceDetails.toggle()
+                        }
+                        .overlay(alignment: .leading) {
+                            AnchoredPopover(isPresented: $showPriceDetails, preferredEdge: .minX) {
+                                PriceDetailPopover(
+                                    price: price,
+                                    details: snapshot.priceDetails,
+                                    source: snapshot.priceSource,
+                                    fetchedAt: snapshot.fetchedAt,
+                                    now: now,
+                                    accentColor: accentColor
+                                )
+                            }
+                            .frame(width: 1, height: 1)
+                            .offset(x: 62)
+                        }
                     }
 
                     if let sats = snapshot.satsPerDollar {
@@ -427,6 +447,11 @@ struct BitcoinMenuView: View {
         "$\(Self.formatPrice(value))"
     }
 
+    fileprivate static func formatPercent(_ value: Double) -> String {
+        let sign = value >= 0 ? "+" : ""
+        return "\(sign)\(String(format: "%.1f", value))%"
+    }
+
     fileprivate static func formatFeeSpan(_ fees: [Double]) -> String {
         guard let minFee = fees.min(), let maxFee = fees.max() else { return "-" }
         return "\(formatFee(minFee)) - \(formatFee(maxFee)) sat/vB"
@@ -471,6 +496,16 @@ struct BitcoinMenuView: View {
         formatter.minimumFractionDigits = 3
         formatter.maximumFractionDigits = 3
         return formatter
+    }
+
+    private static func makeShortDateFormatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter
+    }
+
+    fileprivate static func formatShortDate(_ date: Date) -> String {
+        Self.shortDateFormatter.string(from: date)
     }
 }
 
@@ -572,6 +607,202 @@ private struct BlockDetailPopover: View {
         }
         .padding(12)
         .frame(width: 260)
+    }
+}
+
+private struct PriceDetailPopover: View {
+    let price: Double
+    let details: PriceDetails?
+    let source: PriceSource?
+    let fetchedAt: Date
+    let now: Date
+    let accentColor: Color
+
+    var body: some View {
+        let sparkline = details?.sparkline7d ?? []
+        let last24 = Array(sparkline.suffix(24))
+        let updatedAt = details?.lastUpdated ?? fetchedAt
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Price details")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                Spacer()
+                Text("$\(BitcoinMenuView.formatPrice(price))")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(accentColor)
+            }
+
+            if !last24.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Last 24h")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                    SparklineView(values: last24, lineColor: accentColor)
+                        .frame(height: 36)
+                }
+            }
+
+            Divider()
+
+            if details != nil {
+                PriceDeltaRow(label: "24h change", value: details?.change24h)
+                PriceDeltaRow(label: "7d change", value: details?.change7d)
+                PriceDeltaRow(label: "30d change", value: details?.change30d)
+
+                if let low = details?.low24h, let high = details?.high24h {
+                    BlockDetailRow(
+                        label: "24h range",
+                        value: "\(BitcoinMenuView.formatUSD(low)) - \(BitcoinMenuView.formatUSD(high))"
+                    )
+                }
+
+                if let ath = details?.ath {
+                    BlockDetailRow(
+                        label: "ATH",
+                        value: BitcoinMenuView.formatUSD(ath),
+                        subvalue: details?.athDate.map { BitcoinMenuView.formatShortDate($0) }
+                    )
+                }
+
+            } else {
+                Text("Additional price details unavailable.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+
+            BlockDetailRow(
+                label: "Source",
+                value: source?.label ?? "Unknown"
+            )
+
+            BlockDetailRow(
+                label: "Updated",
+                value: "\(BitcoinMenuView.timeAgoSimple(from: updatedAt, now: now)) ago"
+            )
+
+            if let source {
+                Button {
+                    let urlString = source == .coinGecko
+                        ? "https://www.coingecko.com/en/coins/bitcoin"
+                        : "https://mempool.space"
+                    if let url = URL(string: urlString) {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.system(size: 9))
+                        Text(source == .coinGecko ? "Open CoinGecko" : "Open mempool.space")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 2)
+            }
+        }
+        .padding(12)
+        .frame(width: 260)
+    }
+}
+
+private struct SparklineView: View {
+    let values: [Double]
+    let lineColor: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            if values.count >= 2, let minValue = values.min(), let maxValue = values.max() {
+                let range = max(maxValue - minValue, 0.0001)
+                Path { path in
+                    for index in values.indices {
+                        let x = geo.size.width * CGFloat(index) / CGFloat(values.count - 1)
+                        let y = geo.size.height * (1 - CGFloat((values[index] - minValue) / range))
+                        if index == values.startIndex {
+                            path.move(to: CGPoint(x: x, y: y))
+                        } else {
+                            path.addLine(to: CGPoint(x: x, y: y))
+                        }
+                    }
+                }
+                .stroke(lineColor, lineWidth: 1.4)
+            }
+        }
+    }
+}
+
+private struct PriceDeltaRow: View {
+    let label: String
+    let value: Double?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+            Spacer()
+            if let value {
+                Text(BitcoinMenuView.formatPercent(value))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(value >= 0 ? .green : .red)
+            } else {
+                Text("--")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct AnchoredPopover<PopoverContent: View>: NSViewRepresentable {
+    @Binding var isPresented: Bool
+    var preferredEdge: NSRectEdge = .minX
+    let content: () -> PopoverContent
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        NSView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if isPresented {
+            if context.coordinator.popover == nil {
+                let popover = NSPopover()
+                popover.behavior = .transient
+                popover.delegate = context.coordinator
+                popover.contentViewController = NSHostingController(rootView: content())
+                context.coordinator.popover = popover
+            } else if let hosting = context.coordinator.popover?.contentViewController as? NSHostingController<PopoverContent> {
+                hosting.rootView = content()
+            } else {
+                context.coordinator.popover?.contentViewController = NSHostingController(rootView: content())
+            }
+
+            if context.coordinator.popover?.isShown == false {
+                context.coordinator.popover?.show(relativeTo: nsView.bounds, of: nsView, preferredEdge: preferredEdge)
+            }
+        } else {
+            context.coordinator.popover?.performClose(nil)
+        }
+    }
+
+    final class Coordinator: NSObject, NSPopoverDelegate {
+        var parent: AnchoredPopover
+        var popover: NSPopover?
+
+        init(parent: AnchoredPopover) {
+            self.parent = parent
+        }
+
+        func popoverDidClose(_ notification: Notification) {
+            parent.isPresented = false
+            popover = nil
+        }
     }
 }
 
