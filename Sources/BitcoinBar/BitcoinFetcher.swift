@@ -39,9 +39,16 @@ struct BitcoinFetcher {
     }
 
     private func fetchLatestBlock() async -> BlockInfo? {
-        let url = baseURL.appendingPathComponent("blocks")
+        let v1BlocksURL = v1URL.appendingPathComponent("blocks")
             .appending(queryItems: [URLQueryItem(name: "limit", value: "1")])
-        let blocks: [BlockInfo]? = await fetchArray(BlockInfo.self, url: url)
+        if let blocks: [BlockInfo] = await fetchArray(BlockInfo.self, url: v1BlocksURL),
+           let block = blocks.first {
+            return block
+        }
+
+        let legacyURL = baseURL.appendingPathComponent("blocks")
+            .appending(queryItems: [URLQueryItem(name: "limit", value: "1")])
+        let blocks: [BlockInfo]? = await fetchArray(BlockInfo.self, url: legacyURL)
         return blocks?.first
     }
 

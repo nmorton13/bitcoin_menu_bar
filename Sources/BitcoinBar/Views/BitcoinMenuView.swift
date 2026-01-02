@@ -7,9 +7,13 @@ struct BitcoinMenuView: View {
     @ObservedObject var settings: SettingsStore
     private static let numberFormatter = makeNumberFormatter()
     private static let priceFormatter = makePriceFormatter()
+    private static let dateFormatter = makeDateFormatter()
+    private static let btcFormatter = makeBTCFormatter()
 
     // Bitcoin orange/amber theme
     private let accentColor = Color.orange
+    @State private var showBlockDetails = false
+    @State private var isBlockHovered = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -27,17 +31,22 @@ struct BitcoinMenuView: View {
                         // Bitcoin icon box
                         ZStack {
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(accentColor.opacity(0.2))
+                                .fill(accentColor.opacity(isBlockHovered ? 0.35 : 0.2))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(accentColor.opacity(isBlockHovered ? 0.45 : 0.18), lineWidth: 1)
+                                )
                                 .frame(width: 36, height: 36)
                             Text("₿")
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundStyle(accentColor)
                         }
+                        .shadow(color: accentColor.opacity(isBlockHovered ? 0.35 : 0), radius: 6, x: 0, y: 0)
 
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Block #\(formatNumber(block.height))")
+                            Text("Block #\(Self.formatNumber(block.height))")
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            Text("\(timeAgoSimple(from: date, now: now)) ago")
+                            Text("\(Self.timeAgoSimple(from: date, now: now)) ago")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                         }
@@ -45,7 +54,7 @@ struct BitcoinMenuView: View {
                         Spacer()
 
                         VStack(alignment: .trailing, spacing: 1) {
-                            Text("\(formatNumber(block.txCount))")
+                            Text("\(Self.formatNumber(block.txCount))")
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
                             Text("txns")
                                 .font(.system(size: 10))
@@ -55,6 +64,21 @@ struct BitcoinMenuView: View {
                     .padding(10)
                     .background(Color.primary.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .contentShape(RoundedRectangle(cornerRadius: 10))
+                    .onTapGesture {
+                        showBlockDetails.toggle()
+                    }
+                    .onHover { hovering in
+                        isBlockHovered = hovering
+                    }
+                    .popover(isPresented: $showBlockDetails, attachmentAnchor: .rect(.bounds), arrowEdge: .trailing) {
+                        BlockDetailPopover(
+                            block: block,
+                            snapshot: snapshot,
+                            now: now,
+                            accentColor: accentColor
+                        )
+                    }
                 }
 
                 // Price & Sats Row
@@ -76,7 +100,7 @@ struct BitcoinMenuView: View {
                                     .foregroundStyle(change >= 0 ? .green : .red)
                                 }
                             }
-                            Text("$\(formatPrice(price))")
+                            Text("$\(Self.formatPrice(price))")
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                         }
                         .padding(10)
@@ -90,7 +114,7 @@ struct BitcoinMenuView: View {
                             Text("Sats/$")
                                 .font(.system(size: 9))
                                 .foregroundStyle(.secondary)
-                            Text(formatNumber(sats))
+                            Text(Self.formatNumber(sats))
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                         }
                         .padding(10)
@@ -115,9 +139,9 @@ struct BitcoinMenuView: View {
                         }
 
                         HStack(spacing: 6) {
-                            FeeBox(label: "Low", value: formatFee(fees.hourFee), color: .green)
-                            FeeBox(label: "Med", value: formatFee(fees.halfHourFee), color: .yellow)
-                            FeeBox(label: "High", value: formatFee(fees.fastestFee), color: .red)
+                            FeeBox(label: "Low", value: Self.formatFee(fees.hourFee), color: .green)
+                            FeeBox(label: "Med", value: Self.formatFee(fees.halfHourFee), color: .yellow)
+                            FeeBox(label: "High", value: Self.formatFee(fees.fastestFee), color: .red)
                         }
                         .fixedSize(horizontal: false, vertical: true)
                     }
@@ -234,7 +258,7 @@ struct BitcoinMenuView: View {
 
             if let snapshot = store.snapshot {
                 HStack {
-                    Text("Updated \(timeAgoSimple(from: snapshot.fetchedAt, now: now)) ago")
+                    Text("Updated \(Self.timeAgoSimple(from: snapshot.fetchedAt, now: now)) ago")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -334,20 +358,23 @@ struct BitcoinMenuView: View {
                 }
             }
         }
+        .onChange(of: store.snapshot?.block?.id) { _ in
+            showBlockDetails = false
+        }
         .padding(8)
         .frame(width: 280)
         .background(.ultraThinMaterial)
     }
 
-    private func formatNumber(_ number: Int) -> String {
+    fileprivate static func formatNumber(_ number: Int) -> String {
         Self.numberFormatter.string(from: NSNumber(value: number)) ?? "\(number)"
     }
 
-    private func formatPrice(_ price: Double) -> String {
+    fileprivate static func formatPrice(_ price: Double) -> String {
         Self.priceFormatter.string(from: NSNumber(value: price)) ?? String(format: "%.2f", price)
     }
 
-    private func formatFee(_ fee: Double) -> String {
+    fileprivate static func formatFee(_ fee: Double) -> String {
         let isWhole = abs(fee.rounded() - fee) < 0.0001
         if fee >= 10 {
             return String(format: isWhole ? "%.0f" : "%.1f", fee)
@@ -358,7 +385,7 @@ struct BitcoinMenuView: View {
         }
     }
 
-    private func timeAgoSimple(from date: Date, now: Date) -> String {
+    fileprivate static func timeAgoSimple(from date: Date, now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(date)))
         if seconds < 5 {
             return "just now"
@@ -377,6 +404,47 @@ struct BitcoinMenuView: View {
         }
     }
 
+    fileprivate static func formatDateTime(_ date: Date) -> String {
+        Self.dateFormatter.string(from: date)
+    }
+
+    fileprivate static func formatSize(_ bytes: Int) -> String {
+        let mb = Double(bytes) / 1_000_000
+        return String(format: "%.2f MB", mb)
+    }
+
+    fileprivate static func formatWeight(_ weight: Int) -> String {
+        let mwu = Double(weight) / 1_000_000
+        return String(format: "%.2f MWU", mwu)
+    }
+
+    fileprivate static func formatBTC(_ value: Double) -> String {
+        let formatted = Self.btcFormatter.string(from: NSNumber(value: value)) ?? String(format: "%.3f", value)
+        return "\(formatted) BTC"
+    }
+
+    fileprivate static func formatUSD(_ value: Double) -> String {
+        "$\(Self.formatPrice(value))"
+    }
+
+    fileprivate static func formatFeeSpan(_ fees: [Double]) -> String {
+        guard let minFee = fees.min(), let maxFee = fees.max() else { return "-" }
+        return "\(formatFee(minFee)) - \(formatFee(maxFee)) sat/vB"
+    }
+
+    fileprivate static func shortHash(_ hash: String) -> String {
+        guard hash.count > 16 else { return hash }
+        let start = hash.prefix(6)
+        let end = hash.suffix(6)
+        return "\(start)...\(end)"
+    }
+
+    fileprivate static func blockSubsidyBTC(height: Int) -> Double {
+        let halvings = height / 210_000
+        if halvings >= 64 { return 0 }
+        return 50.0 / pow(2.0, Double(halvings))
+    }
+
     private static func makeNumberFormatter() -> NumberFormatter {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -389,6 +457,151 @@ struct BitcoinMenuView: View {
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
         return formatter
+    }
+
+    private static func makeDateFormatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }
+
+    private static func makeBTCFormatter() -> NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 3
+        formatter.maximumFractionDigits = 3
+        return formatter
+    }
+}
+
+private struct BlockDetailPopover: View {
+    let block: BlockInfo
+    let snapshot: BitcoinSnapshot
+    let now: Date
+    let accentColor: Color
+
+    var body: some View {
+        let blockDate = Date(timeIntervalSince1970: block.timestamp)
+        let timeAgo = BitcoinMenuView.timeAgoSimple(from: blockDate, now: now)
+        let feeRange = block.extras?.feeRange
+        let medianFee = block.extras?.medianFee
+        let totalFeesBTC = block.extras?.totalFeesBTC
+        let rewardBTC = block.extras?.rewardBTC
+        let priceUSD = snapshot.priceUSD
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Block details")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                Spacer()
+                Text("#\(BitcoinMenuView.formatNumber(block.height))")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(accentColor)
+            }
+
+            Divider()
+
+            BlockDetailRow(
+                label: "Hash",
+                value: BitcoinMenuView.shortHash(block.id),
+                monospaced: true
+            )
+
+            BlockDetailRow(
+                label: "Timestamp",
+                value: BitcoinMenuView.formatDateTime(blockDate),
+                subvalue: "(\(timeAgo) ago)"
+            )
+
+            BlockDetailRow(
+                label: "Size",
+                value: BitcoinMenuView.formatSize(block.size)
+            )
+
+            BlockDetailRow(
+                label: "Weight",
+                value: BitcoinMenuView.formatWeight(block.weight)
+            )
+
+            BlockDetailRow(
+                label: "Transactions",
+                value: BitcoinMenuView.formatNumber(block.txCount)
+            )
+
+            if let feeRange, !feeRange.isEmpty {
+                BlockDetailRow(
+                    label: "Fee span",
+                    value: BitcoinMenuView.formatFeeSpan(feeRange)
+                )
+            }
+
+            if let medianFee {
+                BlockDetailRow(
+                    label: "Median fee",
+                    value: "~\(BitcoinMenuView.formatFee(medianFee)) sat/vB"
+                )
+            }
+
+            if let totalFeesBTC {
+                BlockDetailRow(
+                    label: "Total fees",
+                    value: BitcoinMenuView.formatBTC(totalFeesBTC),
+                    subvalue: priceUSD.map { BitcoinMenuView.formatUSD($0 * totalFeesBTC) }
+                )
+            }
+
+            if let rewardBTC {
+                BlockDetailRow(
+                    label: "Subsidy + fees",
+                    value: BitcoinMenuView.formatBTC(rewardBTC),
+                    subvalue: priceUSD.map { BitcoinMenuView.formatUSD($0 * rewardBTC) }
+                )
+            } else if let totalFeesBTC {
+                let subsidy = BitcoinMenuView.blockSubsidyBTC(height: block.height)
+                let totalReward = subsidy + totalFeesBTC
+                BlockDetailRow(
+                    label: "Subsidy + fees",
+                    value: BitcoinMenuView.formatBTC(totalReward),
+                    subvalue: priceUSD.map { BitcoinMenuView.formatUSD($0 * totalReward) }
+                )
+            }
+
+            if let miner = block.extras?.poolName {
+                BlockDetailRow(label: "Miner", value: miner)
+            }
+        }
+        .padding(12)
+        .frame(width: 260)
+    }
+}
+
+private struct BlockDetailRow: View {
+    let label: String
+    let value: String
+    var subvalue: String? = nil
+    var monospaced: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(label)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(value)
+                    .font(.system(size: 10, weight: .semibold, design: monospaced ? .monospaced : .rounded))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            if let subvalue {
+                HStack {
+                    Spacer()
+                    Text(subvalue)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }
 
