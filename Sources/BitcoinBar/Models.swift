@@ -196,6 +196,7 @@ struct BitcoinSnapshot {
     var priceUSD: Double?
     var priceChange24h: Double?
     var priceSource: PriceSource?
+    var priceDetails: PriceDetails?
     var fees: FeesResponse?
     var difficulty: DifficultyAdjustment?
     var fetchedAt: Date
@@ -223,4 +224,60 @@ struct CoinGeckoPrice: Decodable {
 
 struct CoinGeckoResponse: Decodable {
     let bitcoin: CoinGeckoPrice?
+}
+
+struct PriceDetails {
+    let change24h: Double?
+    let change7d: Double?
+    let change30d: Double?
+    let high24h: Double?
+    let low24h: Double?
+    let ath: Double?
+    let athDate: Date?
+    let atl: Double?
+    let atlDate: Date?
+    let lastUpdated: Date?
+    let sparkline7d: [Double]?
+}
+
+struct CoinGeckoMarketData: Decodable {
+    let currentPrice: [String: Double]?
+    let priceChangePercentage24h: Double?
+    let priceChangePercentage7d: Double?
+    let priceChangePercentage30d: Double?
+    let high24h: [String: Double]?
+    let low24h: [String: Double]?
+    let ath: [String: Double]?
+    let atl: [String: Double]?
+    let athDate: [String: String]?
+    let atlDate: [String: String]?
+    let lastUpdated: String?
+    let sparkline7d: CoinGeckoSparkline?
+
+    enum CodingKeys: String, CodingKey {
+        case currentPrice = "current_price"
+        case priceChangePercentage24h = "price_change_percentage_24h"
+        case priceChangePercentage7d = "price_change_percentage_7d"
+        case priceChangePercentage30d = "price_change_percentage_30d"
+        case high24h = "high_24h"
+        case low24h = "low_24h"
+        case ath
+        case atl
+        case athDate = "ath_date"
+        case atlDate = "atl_date"
+        case lastUpdated = "last_updated"
+        case sparkline7d = "sparkline_7d"
+    }
+}
+
+struct CoinGeckoSparkline: Decodable {
+    let price: [Double]
+}
+
+struct CoinGeckoCoinResponse: Decodable {
+    let marketData: CoinGeckoMarketData?
+
+    enum CodingKeys: String, CodingKey {
+        case marketData = "market_data"
+    }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-struct BitcoinFetcher {
+struct BitcoinFetcher: Sendable {
     private let baseURL = URL(string: "https://mempool.space/api")!
     private let v1URL = URL(string: "https://mempool.space/api/v1")!
     private let coinGeckoURL = URL(string: "https://api.coingecko.com/api/v3")!
@@ -20,7 +20,7 @@ struct BitcoinFetcher {
     func fetchSnapshot() async -> BitcoinSnapshot {
         async let block: BlockInfo? = fetchLatestBlock()
         async let mempool: MempoolStats? = fetchMempoolStats()
-        async let priceData: (price: Double?, change: Double?, source: PriceSource?) = fetchPriceWithChange()
+        async let priceData: (price: Double?, change: Double?, source: PriceSource?, details: PriceDetails?) = fetchPriceDetails()
         async let fees: FeesResponse? = fetchFees()
         async let difficulty: DifficultyAdjustment? = fetchDifficulty()
 
@@ -31,6 +31,7 @@ struct BitcoinFetcher {
             priceUSD: price.price,
             priceChange24h: price.change,
             priceSource: price.source,
+            priceDetails: price.details,
             fees: await fees,
             difficulty: await difficulty,
             fetchedAt: Date()
@@ -57,25 +58,55 @@ struct BitcoinFetcher {
         return await fetch(url: url, as: MempoolStats.self)
     }
 
-    private func fetchPriceWithChange() async -> (price: Double?, change: Double?, source: PriceSource?) {
-        // Try CoinGecko first for 24h change
-        let url = coinGeckoURL.appendingPathComponent("simple/price")
-            .appending(queryItems: [
-                URLQueryItem(name: "ids", value: "bitcoin"),
-                URLQueryItem(name: "vs_currencies", value: "usd"),
-                URLQueryItem(name: "include_24hr_change", value: "true")
-            ])
-
-        if let response: CoinGeckoResponse = await fetch(url: url, as: CoinGeckoResponse.self),
-           let bitcoin = response.bitcoin {
-            return (bitcoin.usd, bitcoin.usd24hChange, .coinGecko)
+    private func fetchPriceDetails() async -> (price: Double?, change: Double?, source: PriceSource?, details: PriceDetails?) {
+        if let detailsResponse: CoinGeckoCoinResponse = await fetchCoinGeckoDetails(),
+           let marketData = detailsResponse.marketData,
+           let priceUSD = marketData.currentPrice?["usd"] {
+            let details = PriceDetails(
+                change24h: marketData.priceChangePercentage24h,
+                change7d: marketData.priceChangePercentage7d,
+                change30d: marketData.priceChangePercentage30d,
+                high24h: marketData.high24h?["usd"],
+                low24h: marketData.low24h?["usd"],
+                ath: marketData.ath?["usd"],
+                athDate: parseISODate(marketData.athDate?["usd"]),
+                atl: marketData.atl?["usd"],
+                atlDate: parseISODate(marketData.atlDate?["usd"]),
+                lastUpdated: parseISODate(marketData.lastUpdated),
+                sparkline7d: marketData.sparkline7d?.price
+            )
+            return (priceUSD, marketData.priceChangePercentage24h, .coinGecko, details)
         }
 
-        // Fallback to mempool.space (no 24h change)
+        // Fallback to mempool.space (no extra details)
         let mempoolURL = v1URL.appendingPathComponent("prices")
         let mempoolResponse: PriceResponse? = await fetch(url: mempoolURL, as: PriceResponse.self)
         let source: PriceSource? = mempoolResponse?.usd == nil ? nil : .mempool
-        return (mempoolResponse?.usd, nil, source)
+        return (mempoolResponse?.usd, nil, source, nil)
+    }
+
+    private func fetchCoinGeckoDetails() async -> CoinGeckoCoinResponse? {
+        let url = coinGeckoURL.appendingPathComponent("coins/bitcoin")
+            .appending(queryItems: [
+                URLQueryItem(name: "localization", value: "false"),
+                URLQueryItem(name: "tickers", value: "false"),
+                URLQueryItem(name: "market_data", value: "true"),
+                URLQueryItem(name: "community_data", value: "false"),
+                URLQueryItem(name: "developer_data", value: "false"),
+                URLQueryItem(name: "sparkline", value: "true")
+            ])
+        return await fetch(url: url, as: CoinGeckoCoinResponse.self)
+    }
+
+    private func parseISODate(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        let formatterWithFractional = ISO8601DateFormatter()
+        formatterWithFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatterWithFractional.date(from: value) {
+            return date
+        }
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: value)
     }
 
     private func fetchFees() async -> FeesResponse? {
