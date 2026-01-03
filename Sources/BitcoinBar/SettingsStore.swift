@@ -6,6 +6,7 @@ import ServiceManagement
 final class SettingsStore: ObservableObject {
     @Published var refreshInterval: RefreshInterval
     @Published var iconStyle: IconStyle
+    @Published var fiatCurrency: FiatCurrency
     @Published var launchAtLogin: Bool
     @Published var launchError: String?
 
@@ -17,6 +18,7 @@ final class SettingsStore: ObservableObject {
         let defaults = UserDefaults.standard
         refreshInterval = RefreshInterval(rawValue: defaults.string(forKey: "refreshInterval") ?? "") ?? .tenMinutes
         iconStyle = IconStyle(rawValue: defaults.string(forKey: "iconStyle") ?? "") ?? .bitcoinSymbol
+        fiatCurrency = FiatCurrency(rawValue: defaults.string(forKey: "fiatCurrency") ?? "") ?? .usd
         launchAtLogin = defaults.bool(forKey: "launchAtLogin")
     }
 
@@ -28,6 +30,21 @@ final class SettingsStore: ObservableObject {
     func setIconStyle(_ value: IconStyle) {
         iconStyle = value
         UserDefaults.standard.set(value.rawValue, forKey: "iconStyle")
+    }
+
+    func cycleFiatCurrency() {
+        let list = FiatCurrency.major
+        guard let index = list.firstIndex(of: fiatCurrency) else {
+            setFiatCurrency(.usd)
+            return
+        }
+        let next = list[(index + 1) % list.count]
+        setFiatCurrency(next)
+    }
+
+    func setFiatCurrency(_ value: FiatCurrency) {
+        fiatCurrency = value
+        UserDefaults.standard.set(value.rawValue, forKey: "fiatCurrency")
     }
 
     func toggleLaunchAtLogin(_ enabled: Bool) {
