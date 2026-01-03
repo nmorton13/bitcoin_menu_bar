@@ -16,6 +16,8 @@ struct BitcoinMenuView: View {
     @State private var showBlockDetails = false
     @State private var isBlockHovered = false
     @State private var showPriceDetails = false
+    @State private var isPriceHovered = false
+    @State private var isSatsHovered = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -90,7 +92,8 @@ struct BitcoinMenuView: View {
                             HStack {
                                 Text("Price")
                                     .font(.system(size: 9))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(isPriceHovered ? accentColor : .secondary)
+                                    .shadow(color: accentColor.opacity(isPriceHovered ? 0.55 : 0), radius: 4, x: 0, y: 0)
                                 Spacer()
                                 if let change = snapshot.priceChange24h {
                                     HStack(spacing: 2) {
@@ -113,6 +116,9 @@ struct BitcoinMenuView: View {
                         .onTapGesture {
                             showPriceDetails.toggle()
                         }
+                        .onHover { hovering in
+                            isPriceHovered = hovering
+                        }
                         .overlay(alignment: .leading) {
                             AnchoredPopover(isPresented: $showPriceDetails, preferredEdge: .minX) {
                                 PriceDetailPopover(
@@ -129,18 +135,31 @@ struct BitcoinMenuView: View {
                         }
                     }
 
-                    if let sats = snapshot.satsPerDollar {
+                    if snapshot.priceUSD != nil || snapshot.priceDetails?.currentPrice != nil {
+                        let fiat = settings.fiatCurrency
+                        let currentPrice = snapshot.priceDetails?.currentPrice?[fiat.rawValue]
+                            ?? (fiat == .usd ? snapshot.priceUSD : nil)
+                        let satsValue = currentPrice.map { Int((100_000_000 / $0).rounded()) }
+
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Sats/$")
+                            Text(fiat.satsLabel)
                                 .font(.system(size: 9))
-                                .foregroundStyle(.secondary)
-                            Text(Self.formatNumber(sats))
+                                .foregroundStyle(isSatsHovered ? accentColor : .secondary)
+                                .shadow(color: accentColor.opacity(isSatsHovered ? 0.55 : 0), radius: 4, x: 0, y: 0)
+                            Text(satsValue.map(Self.formatNumber) ?? "--")
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                         }
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.primary.opacity(0.06))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
+                        .onTapGesture {
+                            settings.cycleFiatCurrency()
+                        }
+                        .onHover { hovering in
+                            isSatsHovered = hovering
+                        }
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)

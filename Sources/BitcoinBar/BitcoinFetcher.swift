@@ -63,6 +63,7 @@ struct BitcoinFetcher: Sendable {
            let marketData = detailsResponse.marketData,
            let priceUSD = marketData.currentPrice?["usd"] {
             let details = PriceDetails(
+                currentPrice: marketData.currentPrice,
                 change24h: marketData.priceChangePercentage24h,
                 change7d: marketData.priceChangePercentage7d,
                 change30d: marketData.priceChangePercentage30d,

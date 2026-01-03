@@ -41,6 +41,53 @@ enum RefreshInterval: String, CaseIterable, Identifiable {
     }
 }
 
+enum FiatCurrency: String, CaseIterable, Identifiable {
+    case usd
+    case eur
+    case gbp
+    case jpy
+    case cad
+    case aud
+    case chf
+    case cny
+    case hkd
+    case sgd
+
+    var id: String { rawValue }
+
+    var code: String {
+        rawValue.uppercased()
+    }
+
+    var symbol: String {
+        switch self {
+        case .usd: return "$"
+        case .eur: return "€"
+        case .gbp: return "£"
+        case .jpy: return "¥"
+        case .cad: return "C$"
+        case .aud: return "A$"
+        case .chf: return "CHF"
+        case .cny: return "¥"
+        case .hkd: return "HK$"
+        case .sgd: return "S$"
+        }
+    }
+
+    var satsLabel: String {
+        switch self {
+        case .usd:
+            return "Sats/$"
+        default:
+            return "Sats/\(code)"
+        }
+    }
+
+    static var major: [FiatCurrency] {
+        [.usd, .eur, .gbp, .jpy, .cad, .aud, .chf, .cny, .hkd, .sgd]
+    }
+}
+
 enum PriceSource: String {
     case coinGecko
     case mempool
@@ -227,6 +274,7 @@ struct CoinGeckoResponse: Decodable {
 }
 
 struct PriceDetails {
+    let currentPrice: [String: Double]?
     let change24h: Double?
     let change7d: Double?
     let change30d: Double?
