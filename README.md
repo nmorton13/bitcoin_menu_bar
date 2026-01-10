@@ -4,12 +4,19 @@ A minimal macOS menu bar app that displays real-time Bitcoin network information
 
 ## Features
 
-- 📊 Live Bitcoin block height and stats
-- 💰 Current BTC price, sats per dollar, and 24h change
+- 📊 Live Bitcoin block height and stats with a details popover
+- 💰 Current BTC price, 24h change, and a price details popover
+- 🔁 Sats-per-fiat display with tap-to-cycle currencies (USD, EUR, GBP, JPY, CAD, AUD, CHF, CNY, HKD, SGD)
 - ⚡ Network fee recommendations
 - ⏱️ Average block time, difficulty progress, and retarget estimate
 - 🔄 Manual or automatic refresh intervals (5, 10, or 15 minutes)
 - 🎨 Compact card-based menu layout with menu bar icon options
+
+## Tips
+
+- Click the block card to see hash, time, size/weight, fees, and miner details.
+- Click the price card to see a 24h sparkline, 24h/7d/30d changes, range, and ATH.
+- Click the sats card to cycle fiat currencies.
 
 ## Download
 
