@@ -44,16 +44,16 @@ echo "Building app..."
 ./Scripts/package_app.sh release
 
 # Sign the app
-echo "Signing with $APP_IDENTITY..."
+echo "Signing with Developer ID Application identity..."
 codesign --force --deep --options runtime --timestamp --sign "$APP_IDENTITY" "$APP_BUNDLE"
 
 # Verify signature
 echo "Verifying signature..."
-codesign --verify --verbose "$APP_BUNDLE"
+codesign --verify --deep --strict --verbose "$APP_BUNDLE"
 
 # Create zip for notarization
 echo "Creating notarization zip..."
-ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$TEMP_DIR/BitcoinBarNotarize.zip"
+ditto -c -k --keepParent "$APP_BUNDLE" "$TEMP_DIR/BitcoinBarNotarize.zip"
 
 # Submit for notarization
 echo "Submitting for notarization (this may take several minutes)..."
@@ -63,18 +63,18 @@ xcrun notarytool submit "$TEMP_DIR/BitcoinBarNotarize.zip" \
   --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
   --wait
 
-# Staple the notarization ticket
-echo "Stapling notarization ticket..."
-xcrun stapler staple "$APP_BUNDLE"
-
 # Create final release zip
 echo "Creating release zip..."
-ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$ZIP_NAME"
+rm -f "$ZIP_NAME"
+ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_NAME"
 
-# Validate
-echo "Validating..."
-spctl -a -t exec -vv "$APP_BUNDLE"
-stapler validate "$APP_BUNDLE"
+# Validate the exact app users will receive after extracting the ZIP.
+echo "Validating extracted release..."
+VERIFY_DIR="$TEMP_DIR/verify"
+mkdir -p "$VERIFY_DIR"
+ditto -x -k "$ZIP_NAME" "$VERIFY_DIR"
+codesign --verify --deep --strict --verbose "$VERIFY_DIR/$APP_BUNDLE"
+spctl -a -t exec -vv "$VERIFY_DIR/$APP_BUNDLE"
 
 echo ""
 echo "✅ Done! Release ready: $ZIP_NAME"
