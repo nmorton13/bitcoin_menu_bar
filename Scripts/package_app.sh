@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 CONF=${1:-release}
-VERSION=${VERSION:-1.0.2}
-BUILD=${BUILD:-3}
-ROOT=$(cd "$(dirname "$0")/.." && pwd)
+VERSION=${VERSION:-1.0.3}
+BUILD=${BUILD:-4}
+ROOT=$(cd -P "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
 echo "Building BitcoinBar in $CONF mode..."
-swift build -c "$CONF" --arch arm64
+PATH_MAP="$ROOT=."
+swift build -c "$CONF" --arch arm64 \
+  -Xswiftc -debug-prefix-map -Xswiftc "$PATH_MAP" \
+  -Xswiftc -file-prefix-map -Xswiftc "$PATH_MAP"
 
+BINARY=".build/$CONF/BitcoinBar"
 APP="$ROOT/BitcoinBar.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -36,8 +40,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 echo "Copying executable..."
-cp ".build/$CONF/BitcoinBar" "$APP/Contents/MacOS/BitcoinBar"
+cp "$BINARY" "$APP/Contents/MacOS/BitcoinBar"
+strip -S "$APP/Contents/MacOS/BitcoinBar"
 chmod +x "$APP/Contents/MacOS/BitcoinBar"
+
+if LC_ALL=C grep -aFq "$ROOT" "$APP/Contents/MacOS/BitcoinBar"; then
+  echo "ERROR: Packaged executable contains the local repository path" >&2
+  exit 1
+fi
 
 echo "Copying icon..."
 if [[ -f "$ROOT/Icon.icns" ]]; then

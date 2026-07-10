@@ -12,7 +12,6 @@ DerivedData/
 BitcoinBar.app
 *.zip
 *.dmg
-RELEASE.md
 
 # macOS
 .DS_Store
@@ -33,4 +32,42 @@ idea.txt
 .vscode/
 .idea/
 
-RELEASE.md 
+AGENTS.md
+CLAUDE.md
+
+# Credentials and signing material
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+*.cer
+*.crt
+credentials.json
+secrets.*
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+.appstoreconnect/
+.asc/
+.aws/
+
+# Private runtime data
+*.sqlite
+*.sqlite3
+*.db
+*.log
+*.bak
+*.backup
+*.tar
+*.tgz
+*.gz
+*.7z
+tmp/

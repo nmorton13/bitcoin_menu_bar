@@ -78,8 +78,7 @@ Inspiration came from [CodexBar](https://github.com/steipete/CodexBar) by Peter 
 
 ## Author & Links
 
-- nmorton — X: [@nmorton](https://x.com/nmorton)
-- Nostr: `npub10altrre5jyv54ve3f4fxsd4t9ss7xlk8pvvrqp42lwcqv6z750uqpje5a6`
+- Contact: X [@nmorton](https://x.com/nmorton)
 - Projects: [hodljuice.app](https://hodljuice.app) (web podcast player), [thebtcbrew.com](https://thebtcbrew.com) (podcast & newsletter)
 
 ## Support

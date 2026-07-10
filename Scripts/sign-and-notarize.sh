@@ -4,7 +4,7 @@ set -euo pipefail
 APP_NAME="BitcoinBar"
 APP_IDENTITY="${APP_IDENTITY:-Developer ID Application}"
 APP_BUNDLE="BitcoinBar.app"
-VERSION="1.0.2"
+VERSION="1.0.3"
 ZIP_NAME="BitcoinBar-${VERSION}.zip"
 
 # Look for API key file
@@ -53,7 +53,7 @@ codesign --verify --verbose "$APP_BUNDLE"
 
 # Create zip for notarization
 echo "Creating notarization zip..."
-ditto -c -k --keepParent "$APP_BUNDLE" "$TEMP_DIR/BitcoinBarNotarize.zip"
+ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$TEMP_DIR/BitcoinBarNotarize.zip"
 
 # Submit for notarization
 echo "Submitting for notarization (this may take several minutes)..."
@@ -69,7 +69,7 @@ xcrun stapler staple "$APP_BUNDLE"
 
 # Create final release zip
 echo "Creating release zip..."
-ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_NAME"
+ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$ZIP_NAME"
 
 # Validate
 echo "Validating..."
