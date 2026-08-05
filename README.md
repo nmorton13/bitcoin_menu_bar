@@ -2,15 +2,13 @@
 
 A minimal macOS menu bar app that displays real-time Bitcoin network information.
 
-## Screenshots
-
-<p align="center">
-  <img src="docs/images/bitcoinbar-menu.png" alt="BitcoinBar menu showing block, price, fees, and difficulty information" width="294">
-</p>
+## Preview
 
 <p align="center">
   <img src="docs/images/bitcoinbar-block-details.png" alt="BitcoinBar block details popover" width="49%">
   <img src="docs/images/bitcoinbar-price-details.png" alt="BitcoinBar price details popover" width="49%">
+  <br>
+  <strong>Block details</strong> (left) · <strong>Price details</strong> (right)
 </p>
 
 ## Features
