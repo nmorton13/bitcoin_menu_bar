@@ -302,8 +302,8 @@ struct BitcoinMenuView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     if let source = snapshot.priceSource {
-                        Text("Price: \(source.label)")
-                            .font(.system(size: 9))
+                        Text(source == .coinGecko ? "Powered by CoinGecko" : "Price: \(source.label)")
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -703,7 +703,7 @@ private struct PriceDetailPopover: View {
             if let source {
                 Button {
                     let urlString = source == .coinGecko
-                        ? "https://www.coingecko.com/en/coins/bitcoin"
+                        ? "https://www.coingecko.com/en/api"
                         : "https://mempool.space"
                     if let url = URL(string: urlString) {
                         NSWorkspace.shared.open(url)
@@ -712,7 +712,7 @@ private struct PriceDetailPopover: View {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.up.right.square")
                             .font(.system(size: 9))
-                        Text(source == .coinGecko ? "Open CoinGecko" : "Open mempool.space")
+                        Text(source == .coinGecko ? "Powered by CoinGecko" : "Open mempool.space")
                             .font(.system(size: 10))
                     }
                     .foregroundStyle(.secondary)

@@ -45,9 +45,9 @@ final class BlockStore: ObservableObject {
         guard !isFetching else { return }
         isFetching = true
         errorMessage = nil
-        let result = await fetchWithRetry()
+        let result = await fetchSnapshot()
 
-        if let result {
+        if result.hasData {
             snapshot = result.preservingMissingValues(from: snapshot)
             lastSuccessfulFetch = Date()
             isFetching = false
@@ -89,25 +89,6 @@ final class BlockStore: ObservableObject {
                 self.updateStaleness()
             }
         }
-    }
-
-    private func fetchWithRetry() async -> BitcoinSnapshot? {
-        let delays: [Duration] = [.seconds(0), .seconds(1), .seconds(3)]
-
-        for delay in delays {
-            if delay > .zero {
-                try? await Task.sleep(for: delay)
-            }
-
-            let snapshot = await fetchSnapshot()
-            if snapshot.hasData {
-                return snapshot
-            }
-
-            if Task.isCancelled { break }
-        }
-
-        return nil
     }
 
     private func updateStaleness() {

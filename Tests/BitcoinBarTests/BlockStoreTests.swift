@@ -4,6 +4,30 @@ import XCTest
 
 @MainActor
 final class BlockStoreTests: XCTestCase {
+    func testRefreshDoesNotBurstRetryWhenSnapshotIsEmpty() async {
+        let counter = SnapshotCounter()
+        let store = BlockStore(fetchSnapshot: {
+            await counter.recordCall()
+            return BitcoinSnapshot(
+                block: nil,
+                mempool: nil,
+                priceUSD: nil,
+                priceChange24h: nil,
+                priceSource: nil,
+                priceDetails: nil,
+                fees: nil,
+                difficulty: nil,
+                fetchedAt: Date()
+            )
+        })
+
+        await store.refresh()
+
+        let callCount = await counter.callCount
+        XCTAssertEqual(callCount, 1)
+        XCTAssertEqual(store.errorMessage, "Unable to load Bitcoin data.")
+    }
+
     func testRefreshPreservesFieldsMissingFromPartialResponse() async {
         let responses = SnapshotResponses([
             BitcoinSnapshot(
@@ -54,6 +78,14 @@ final class BlockStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshot?.mempool?.count, 10)
         XCTAssertEqual(store.snapshot?.fees?.fastestFee, 5)
         XCTAssertEqual(store.snapshot?.fetchedAt, Date(timeIntervalSince1970: 200))
+    }
+}
+
+private actor SnapshotCounter {
+    private(set) var callCount = 0
+
+    func recordCall() {
+        callCount += 1
     }
 }
 

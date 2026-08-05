@@ -5,8 +5,10 @@ struct BitcoinFetcher: Sendable {
     private let v1URL = URL(string: "https://mempool.space/api/v1")!
     private let coinGeckoURL = URL(string: "https://api.coingecko.com/api/v3")!
     private let session: URLSession
+    private let rateLimiter: HostRateLimiter
 
-    init(session: URLSession? = nil) {
+    init(session: URLSession? = nil, rateLimiter: HostRateLimiter = HostRateLimiter()) {
+        self.rateLimiter = rateLimiter
         if let session {
             self.session = session
         } else {
@@ -145,24 +147,36 @@ struct BitcoinFetcher: Sendable {
     }
 
     private func fetchArray<T: Decodable>(_ type: T.Type, url: URL) async -> [T]? {
-        do {
-            let (data, response) = try await session.data(from: url)
-            guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
-                return nil
-            }
-            return try JSONDecoder().decode([T].self, from: data)
-        } catch {
-            return nil
-        }
+        guard let data = await fetchData(from: url) else { return nil }
+        return try? JSONDecoder().decode([T].self, from: data)
     }
 
     private func fetch<T: Decodable>(url: URL, as type: T.Type) async -> T? {
+        guard let data = await fetchData(from: url) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func fetchData(from url: URL) async -> Data? {
+        guard let host = url.host,
+              await rateLimiter.shouldStartRequest(to: host) else {
+            return nil
+        }
+
         do {
             let (data, response) = try await session.data(from: url)
-            guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+            guard let http = response as? HTTPURLResponse else { return nil }
+
+            if http.statusCode == 429 {
+                await rateLimiter.recordRateLimit(
+                    for: host,
+                    retryAfter: http.value(forHTTPHeaderField: "Retry-After")
+                )
                 return nil
             }
-            return try JSONDecoder().decode(T.self, from: data)
+
+            guard 200..<300 ~= http.statusCode else { return nil }
+            await rateLimiter.recordSuccess(for: host)
+            return data
         } catch {
             return nil
         }
@@ -170,6 +184,63 @@ struct BitcoinFetcher: Sendable {
 
     private func roundedFee(_ fee: Double) -> Double {
         (fee * 10).rounded(.toNearestOrAwayFromZero) / 10
+    }
+}
+
+actor HostRateLimiter {
+    typealias Jitter = @Sendable (ClosedRange<Double>) -> Double
+
+    private struct LimitState {
+        var consecutiveLimits: Int
+        var blockedUntil: Date
+    }
+
+    private var states: [String: LimitState] = [:]
+    private let jitter: Jitter
+
+    init(jitter: @escaping Jitter = { Double.random(in: $0) }) {
+        self.jitter = jitter
+    }
+
+    func shouldStartRequest(to host: String, now: Date = Date()) -> Bool {
+        guard let state = states[host] else { return true }
+        return now >= state.blockedUntil
+    }
+
+    func recordRateLimit(for host: String, retryAfter: String?, now: Date = Date()) {
+        let consecutiveLimits = min((states[host]?.consecutiveLimits ?? 0) + 1, 5)
+        let exponentialDelay = min(60 * pow(2, Double(consecutiveLimits - 1)), 15 * 60)
+        let requestedDelay = RetryAfterParser.delay(from: retryAfter, now: now) ?? 0
+        let baseDelay = max(exponentialDelay, requestedDelay)
+        let jitterDelay = jitter(0...min(baseDelay * 0.2, 30))
+        let blockedUntil = now.addingTimeInterval(baseDelay + jitterDelay)
+
+        states[host] = LimitState(
+            consecutiveLimits: consecutiveLimits,
+            blockedUntil: max(states[host]?.blockedUntil ?? .distantPast, blockedUntil)
+        )
+    }
+
+    func recordSuccess(for host: String, now: Date = Date()) {
+        guard let state = states[host], now >= state.blockedUntil else { return }
+        states.removeValue(forKey: host)
+    }
+}
+
+enum RetryAfterParser {
+    static func delay(from value: String?, now: Date) -> TimeInterval? {
+        guard let value else { return nil }
+
+        if let seconds = TimeInterval(value.trimmingCharacters(in: .whitespaces)), seconds >= 0 {
+            return seconds
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = formatter.date(from: value) else { return nil }
+        return max(0, date.timeIntervalSince(now))
     }
 }
 
