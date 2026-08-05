@@ -16,6 +16,11 @@ let package = Package(
         .executableTarget(
             name: "BitcoinBar",
             path: "Sources/BitcoinBar"
+        ),
+        .testTarget(
+            name: "BitcoinBarTests",
+            dependencies: ["BitcoinBar"],
+            path: "Tests/BitcoinBarTests"
         )
     ]
 )

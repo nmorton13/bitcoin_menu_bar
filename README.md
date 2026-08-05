@@ -69,13 +69,13 @@ open BitcoinBar.app
 
 - Most Bitcoin data is fetched from the public [mempool.space API](https://mempool.space/docs/api) over HTTPS.
 - BTC price and 24h change are fetched from [CoinGecko](https://www.coingecko.com/en/api).
-- No API keys or personal data are used—just anonymous requests for the latest blocks, mempool stats, price, fees, and difficulty info.
+- No API keys, accounts, or app-supplied personal data are used. Requests contain only the information needed to fetch the latest blocks, mempool stats, price, fees, and difficulty data.
 
 ## Privacy
 
-- The app makes anonymous HTTPS calls to mempool.space for network stats and never sends any personal data.
+- The app sends no app-supplied personal data, account identifiers, or analytics. As with any direct HTTPS request, mempool.space and CoinGecko receive normal connection metadata such as your IP address and request timing.
 - No accounts, tracking, or analytics. Settings (refresh interval, icon style, launch-at-login) are stored locally in `UserDefaults`.
-- If you’re on a hostile network and want extra protection, consider using a trusted DNS/VPN. Certificate pinning is not enabled. 
+- If you’re on a hostile network and want extra protection, consider using a trusted DNS/VPN. Certificate pinning is not enabled.
 
 ## License
 

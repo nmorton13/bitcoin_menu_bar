@@ -9,12 +9,20 @@ final class BlockStore: ObservableObject {
     @Published var lastSuccessfulFetch: Date?
     @Published var isStale = false
 
-    private let fetcher = BitcoinFetcher()
+    private let fetchSnapshot: @Sendable () async -> BitcoinSnapshot
     private var refreshTask: Task<Void, Never>?
     private var stalenessTask: Task<Void, Never>?
     private weak var settings: SettingsStore?
     private var cancellables = Set<AnyCancellable>()
-    private var lastPriceChange24h: Double?
+
+    init() {
+        let fetcher = BitcoinFetcher()
+        fetchSnapshot = { await fetcher.fetchSnapshot() }
+    }
+
+    init(fetchSnapshot: @escaping @Sendable () async -> BitcoinSnapshot) {
+        self.fetchSnapshot = fetchSnapshot
+    }
 
     deinit {
         refreshTask?.cancel()
@@ -40,16 +48,7 @@ final class BlockStore: ObservableObject {
         let result = await fetchWithRetry()
 
         if let result {
-            if let change = result.priceChange24h {
-                lastPriceChange24h = change
-                snapshot = result
-            } else if let lastChange = lastPriceChange24h {
-                var updated = result
-                updated.priceChange24h = lastChange
-                snapshot = updated
-            } else {
-                snapshot = result
-            }
+            snapshot = result.preservingMissingValues(from: snapshot)
             lastSuccessfulFetch = Date()
             isFetching = false
             updateStaleness()
@@ -87,9 +86,7 @@ final class BlockStore: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
                 guard !Task.isCancelled else { break }
-                await MainActor.run {
-                    self.updateStaleness()
-                }
+                self.updateStaleness()
             }
         }
     }
@@ -102,7 +99,7 @@ final class BlockStore: ObservableObject {
                 try? await Task.sleep(for: delay)
             }
 
-            let snapshot = await fetcher.fetchSnapshot()
+            let snapshot = await fetchSnapshot()
             if snapshot.hasData {
                 return snapshot
             }

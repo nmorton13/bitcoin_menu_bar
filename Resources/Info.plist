@@ -8,12 +8,16 @@
     <string>com.randomprojects.bitcoinbar</string>
     <key>CFBundleName</key>
     <string>BitcoinBar</string>
+    <key>CFBundleDisplayName</key>
+    <string>BitcoinBar</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>Icon</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.3</string>
+    <string>1.0.4</string>
     <key>CFBundleVersion</key>
-    <string>4</string>
+    <string>5</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
     <key>LSUIElement</key>

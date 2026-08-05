@@ -75,7 +75,7 @@ struct BitcoinMenuView: View {
                     .onHover { hovering in
                         isBlockHovered = hovering
                     }
-                    .popover(isPresented: $showBlockDetails, attachmentAnchor: .rect(.bounds), arrowEdge: .trailing) {
+                    .popover(isPresented: $showBlockDetails, attachmentAnchor: .rect(.bounds), arrowEdge: .leading) {
                         BlockDetailPopover(
                             block: block,
                             snapshot: snapshot,
@@ -397,7 +397,7 @@ struct BitcoinMenuView: View {
                 }
             }
         }
-        .onChange(of: store.snapshot?.block?.id) { _ in
+        .onChange(of: store.snapshot?.block?.id) { _, _ in
             showBlockDetails = false
         }
         .padding(8)

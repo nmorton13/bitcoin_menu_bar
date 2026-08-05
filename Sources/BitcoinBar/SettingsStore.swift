@@ -3,6 +3,27 @@ import Combine
 import ServiceManagement
 
 @MainActor
+protocol LaunchAtLoginServicing {
+    var isEnabled: Bool { get }
+    func setEnabled(_ enabled: Bool) throws
+}
+
+@MainActor
+struct SystemLaunchAtLoginService: LaunchAtLoginServicing {
+    var isEnabled: Bool {
+        SMAppService.mainApp.status == .enabled
+    }
+
+    func setEnabled(_ enabled: Bool) throws {
+        if enabled {
+            try SMAppService.mainApp.register()
+        } else {
+            try SMAppService.mainApp.unregister()
+        }
+    }
+}
+
+@MainActor
 final class SettingsStore: ObservableObject {
     @Published var refreshInterval: RefreshInterval
     @Published var iconStyle: IconStyle
@@ -10,26 +31,34 @@ final class SettingsStore: ObservableObject {
     @Published var launchAtLogin: Bool
     @Published var launchError: String?
 
+    private let defaults: UserDefaults
+    private let launchAtLoginService: any LaunchAtLoginServicing
+
     var debugMenuEnabled: Bool {
-        UserDefaults.standard.bool(forKey: "debugMenuEnabled")
+        defaults.bool(forKey: "debugMenuEnabled")
     }
 
-    init() {
-        let defaults = UserDefaults.standard
+    init(
+        defaults: UserDefaults = .standard,
+        launchAtLoginService: any LaunchAtLoginServicing = SystemLaunchAtLoginService()
+    ) {
+        self.defaults = defaults
+        self.launchAtLoginService = launchAtLoginService
         refreshInterval = RefreshInterval(rawValue: defaults.string(forKey: "refreshInterval") ?? "") ?? .tenMinutes
         iconStyle = IconStyle(rawValue: defaults.string(forKey: "iconStyle") ?? "") ?? .bitcoinSymbol
         fiatCurrency = FiatCurrency(rawValue: defaults.string(forKey: "fiatCurrency") ?? "") ?? .usd
-        launchAtLogin = defaults.bool(forKey: "launchAtLogin")
+        launchAtLogin = launchAtLoginService.isEnabled
+        defaults.set(launchAtLogin, forKey: "launchAtLogin")
     }
 
     func setRefreshInterval(_ value: RefreshInterval) {
         refreshInterval = value
-        UserDefaults.standard.set(value.rawValue, forKey: "refreshInterval")
+        defaults.set(value.rawValue, forKey: "refreshInterval")
     }
 
     func setIconStyle(_ value: IconStyle) {
         iconStyle = value
-        UserDefaults.standard.set(value.rawValue, forKey: "iconStyle")
+        defaults.set(value.rawValue, forKey: "iconStyle")
     }
 
     func cycleFiatCurrency() {
@@ -44,26 +73,17 @@ final class SettingsStore: ObservableObject {
 
     func setFiatCurrency(_ value: FiatCurrency) {
         fiatCurrency = value
-        UserDefaults.standard.set(value.rawValue, forKey: "fiatCurrency")
+        defaults.set(value.rawValue, forKey: "fiatCurrency")
     }
 
     func toggleLaunchAtLogin(_ enabled: Bool) {
-        launchAtLogin = enabled
-        UserDefaults.standard.set(enabled, forKey: "launchAtLogin")
-        Task { await configureLaunchAtLogin(enabled) }
-    }
-
-    private func configureLaunchAtLogin(_ enabled: Bool) async {
         do {
-            if enabled {
-                try await SMAppService.mainApp.register()
-            } else {
-                try await SMAppService.mainApp.unregister()
-            }
+            try launchAtLoginService.setEnabled(enabled)
             launchError = nil
         } catch {
             launchError = error.localizedDescription
-            launchAtLogin = SMAppService.mainApp.status == .enabled
         }
+        launchAtLogin = launchAtLoginService.isEnabled
+        defaults.set(launchAtLogin, forKey: "launchAtLogin")
     }
 }

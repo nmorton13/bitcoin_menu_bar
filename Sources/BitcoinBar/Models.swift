@@ -257,20 +257,22 @@ struct BitcoinSnapshot {
         let sats = 100_000_000 / priceUSD
         return Int(sats.rounded())
     }
-}
 
-struct CoinGeckoPrice: Decodable {
-    let usd: Double?
-    let usd24hChange: Double?
-
-    enum CodingKeys: String, CodingKey {
-        case usd
-        case usd24hChange = "usd_24h_change"
+    func preservingMissingValues(from previous: BitcoinSnapshot?) -> BitcoinSnapshot {
+        guard let previous else { return self }
+        let hasFreshPrice = priceUSD != nil
+        return BitcoinSnapshot(
+            block: block ?? previous.block,
+            mempool: mempool ?? previous.mempool,
+            priceUSD: hasFreshPrice ? priceUSD : previous.priceUSD,
+            priceChange24h: hasFreshPrice ? priceChange24h : previous.priceChange24h,
+            priceSource: hasFreshPrice ? priceSource : previous.priceSource,
+            priceDetails: hasFreshPrice ? priceDetails : previous.priceDetails,
+            fees: fees ?? previous.fees,
+            difficulty: difficulty ?? previous.difficulty,
+            fetchedAt: fetchedAt
+        )
     }
-}
-
-struct CoinGeckoResponse: Decodable {
-    let bitcoin: CoinGeckoPrice?
 }
 
 struct PriceDetails {
